@@ -21,7 +21,7 @@ def create_game(request):
     else:
         form = GameCreateForm()
 
-    return redirect(request, "index.html", context={"form": form})
+    return render(request, "index.html", context={"form": form})
 
 
 def add_favorite_game(request, game_id):

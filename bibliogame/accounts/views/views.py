@@ -15,7 +15,7 @@ from accounts.forms import RegisterForm, ProfileUpdateForm, RegisterFormWithoutC
 
 def register(request):
     if request.method == 'POST':
-        form = RegisterForm(request.POST)
+        form = RegisterFormWithoutCaptcha(request.POST)
         if form.is_valid():
             email = form.cleaned_data['email']
             if User.objects.filter(email=email).exists():
@@ -31,7 +31,7 @@ def register(request):
                 login(request, user)
                 messages.success(request, 'Registration successful.')
     else:
-        form = RegisterForm()
+        form = RegisterFormWithoutCaptcha()
 
     return render(request, 'register.html', {"form": form})
 
@@ -44,7 +44,7 @@ def login_view(request):
         if user:
             login(request, user)
             next_url = request.GET.get('next')
-            return redirect(next_url or "index")
+            return redirect(next_url or "accounts:profile_view")
         else:
             return render(request, 'login.html', {'error': 'Incorrect login or password'})
     return render(request, 'login.html')
@@ -52,7 +52,7 @@ def login_view(request):
 
 def logout_view(request):
     logout(request)
-    return redirect('bibliogames:index')
+    return redirect('accounts:register')
 
 
 @login_required
@@ -73,7 +73,7 @@ def edit_profile_view(request):
             if avatar:
                 profile.avatar = avatar
             profile.save()
-            return redirect('accounts:edit_profile')
+            return redirect('accounts:edit_profile_view')
     else:
         form = ProfileUpdateForm(user=user)
 
@@ -94,11 +94,11 @@ def confirm_email_view(request):
 
     form_data['email'] = email
 
-    form = RegisterFormWithoutCaptcha(form_data)
+    form = RegisterFormWithoutCaptcha(data=form_data)
     if form.is_valid():
         user = form.save()
         login(request, user)
         del request.session['register_form_data']
         return render(request, "confirm_email.html", {"email": email})
     else:
-        return HttpResponseBadRequest("Invalid form data")
+        return HttpResponseBadRequest(f"Invalid form data")

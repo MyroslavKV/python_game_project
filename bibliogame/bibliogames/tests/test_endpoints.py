@@ -1,13 +1,13 @@
 import pytest
 from django.urls import reverse
 from django.test import Client
-import datetime
+
 from bibliogames.models import FavoriteGame, Favorites
 from .fixtures import game, developer, genres, platforms, favorite_game
 
 
 @pytest.mark.django_db
-def test_user_game_creation_for_moderate(client, game, user, developer, genres, platforms):
+def test_authenticated_user_game_creation_for_moderate(client, game, user, developer, genres, platforms):
     client.force_login(user=user)
 
     data = {
@@ -26,11 +26,25 @@ def test_user_game_creation_for_moderate(client, game, user, developer, genres, 
 
 
 @pytest.mark.django_db
-def test_game_delete_by_moderator(user, client, game):
-    user.is_staff = True
-    user.save()
+def test_not_authenticated_user_game_creation_for_moderate(client, game, user, developer, genres, platforms):
+    data = {
+        "title": "test_game",
+        "description": "test_description",
+        "release_date": "2013-08-12",
+        "developer": developer.id,
+        "genres": [genre.id for genre in genres],
+        "platforms": [platform.id for platform in platforms]
+    }
 
-    client.force_login(user=user)
+    url = reverse("bibliogames:create_game")
+    response = client.post(url, data=data, format="json")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_game_delete_by_moderator(user, client, game, super_user):
+    client.force_login(user=super_user)
 
     url = reverse("bibliogames:delete_game", args=[game.id])
 
@@ -40,11 +54,8 @@ def test_game_delete_by_moderator(user, client, game):
 
 
 @pytest.mark.django_db
-def test_game_moderate_action_approved(user, client, game):
-    user.is_staff = True
-    user.save()
-
-    client.force_login(user=user)
+def test_game_moderate_action_approved(user, client, game, super_user):
+    client.force_login(user=super_user)
 
     url = reverse("bibliogames:moderate_game", args=[game.id, "approve"])
 
@@ -57,11 +68,8 @@ def test_game_moderate_action_approved(user, client, game):
 
 
 @pytest.mark.django_db
-def test_game_moderate_action_rejected(user, client, game):
-    user.is_staff = True
-    user.save()
-
-    client.force_login(user=user)
+def test_game_moderate_action_rejected(user, client, game, super_user):
+    client.force_login(user=super_user)
 
     url = reverse("bibliogames:moderate_game", args=[game.id, "reject"])
 
@@ -74,12 +82,23 @@ def test_game_moderate_action_rejected(user, client, game):
 
 
 @pytest.mark.django_db
-def test_game_moderation_list(user, client, game):
+def test_game_moderate_action_invalid(user, client, game, super_user):
+    client.force_login(user=super_user)
 
-    user.is_staff = True
-    user.save()
+    url = reverse("bibliogames:moderate_game", args=[game.id, "invalid"])
 
-    client.force_login(user=user)
+    response = client.post(url)
+
+    assert response.status_code == 302
+
+    game.refresh_from_db()
+    assert game.status != "approved"
+    assert game.status != "rejected"
+
+
+@pytest.mark.django_db
+def test_game_moderation_list(user, client, game, super_user):
+    client.force_login(user=super_user)
 
     url = reverse("bibliogames:moderation_list")
     response = client.get(url)
